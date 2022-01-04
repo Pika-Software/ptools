@@ -1,4 +1,4 @@
-Msg"MDL RePatherV2 by Klen_list\n"
+Msg"MDL RePatherV3 by Klen_list\n"
 file.CreateDir"mdlrepath"
 
 local nullchar = "\x00"
@@ -34,31 +34,43 @@ local function RePath(mdlpath, new_paths)
 
     w:Write(r:Read(offset - r:Tell()))
 
+    local path_offsets = {}
     local base_offset = math.huge
     for i = 1,count do
-        base_offset = math.min(base_offset, r:ReadULong())
+        local offs = r:ReadULong()
+        path_offsets[offs] = true
+        base_offset = math.min(base_offset, offs)
         w:WriteULong(0)
     end
 
     MsgN("Base offset: ", base_offset)
 
-    w:Write(r:Read(base_offset - r:Tell()))
-
-    for i,newpath in ipairs(new_paths) do
-        local cur = w:Tell()
-        w:Seek(offset + (i - 1) * 4)
-        w:WriteULong(cur) -- write new offsets in series of int
-        w:Seek(cur)
-        w:Write(newpath)
-        w:WriteByte(0)
-    end
+   -- w:Write(r:Read(base_offset - r:Tell()))
 
     MsgN"Old cdmaterials:"
-    for i = 1,count do
+
+    local keys = table.GetKeys(path_offsets)
+    table.sort(keys, function(a, b) return a < b end)
+
+    for i = 1, #keys do -- write to the end, ignore old cdmath data
+        local offs = keys[i]
+        print(offs)
+        w:Write(r:Read(offs - r:Tell()))
         MsgN(" >", ReadStrNullEsc(r))
+        w:WriteByte(0)
+        if i == #keys then
+            for j,newpath in ipairs(new_paths) do
+                local cur = w:Tell()
+                w:Seek(offset + (j - 1) * 4)
+                w:WriteULong(cur) -- write new offsets in series of int
+                w:Seek(cur)
+                w:Write(newpath)
+                w:WriteByte(0)
+            end
+        end
     end
 
-    w:Write(r:Read(r:Size() - r:Tell())) -- write to the end
+    w:Write(r:Read(r:Size() - r:Tell()))
 
     local newsize = w:Tell()
     w:Seek(76)
@@ -71,4 +83,4 @@ local function RePath(mdlpath, new_paths)
 end
 
 -- Example
-RePath("models/player/putin/putin_arms.mdl", {[[test\test\]], [[models\player\]]})
+RePath("models/player/lappland/lappland_arms.mdl", {[[models\player\lappland\]]})
